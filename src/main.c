@@ -7,7 +7,7 @@ int main(int argc, char *argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
    
-while(true)
+while(1)
 {
   // Uncomment this block to pass the first stage
   printf("$ ");
@@ -18,6 +18,11 @@ while(true)
 
  //remove the newline character fromthe input if it exists
   input[strcspn(input, "\n")] = '\0';
+
+  
+  //check if exit is there
+  if(strcmp(input,"exit 0") == 0)
+  return 0;
 
   printf("%s: command not found\n", input);
 }
