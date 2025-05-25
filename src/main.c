@@ -6,7 +6,9 @@
 int main(int argc, char *argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
-
+   
+while(true)
+{
   // Uncomment this block to pass the first stage
   printf("$ ");
 
@@ -18,6 +20,7 @@ int main(int argc, char *argv[]) {
   input[strcspn(input, "\n")] = '\0';
 
   printf("%s: command not found\n", input);
+}
 
   return 0;
 }
