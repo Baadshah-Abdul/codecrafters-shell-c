@@ -5,35 +5,61 @@
 
 int main(int argc, char *argv[]) {
   // Flush after every printf
-  setbuf(stdout, NULL);
-   char check[100];
-   char out[100];
+	setbuf(stdout, NULL);
+	char command[100];
+	char shell_cmd[][100] = {"echo", "exit", "type"};
+	int n = 3;
+
 while(1)
 {
-  // Uncomment this block to pass the first stage
-  printf("$ ");
+	printf("$ ");
+	char input[100];
+	fgets(input, 100, stdin);
+	input[strcspn(input, "\n")] = '\0';
 
-  // Wait for user input
-  char input[100];
-  fgets(input, 100, stdin);
+	//continue even if empty
+	if(strlen(input) == 0)
+		continue;
 
- //remove the newline character fromthe input if it exists
-  input[strcspn(input, "\n")] = '\0';
+	//extract command from input
+	sscanf(input, "%s", command);
 
-  
-  //check if exit is there
-  if(strcmp(input,"exit 0") == 0)
-  return 0;
+	//exit 0
+	if(strcmp(command,"exit") == 0)
+	return 0;
 
-//check for echo
-	strncpy(check, input, 4);
-	int echo_start = 5;
-	if (strcmp(check,"echo") == 0)
+	//check for echo
+	if(strcmp(command,"echo") == 0)
 		{
-			printf("%s\n", input + echo_start);
+			printf("%s\n", input + 5);
+			continue;
 		}
-	else
-	printf("%s: command not found\n", input);
+
+	//check for type commands
+	if(strcmp(command,"type") == 0)
+	{
+		char *type_command = input + 5;
+		char *space = strchr(type_command, ' ');
+		//NULl terminate the command at the first space
+		if(space != NULL)
+			*space = '\0';
+		
+		int found = 0;
+		for(int i = 0; i < n; i++)
+		{
+			if(strcmp(type_command, shell_cmd[i]) == 0)
+			{
+				printf("%s is a shell builtin\n", type_command);
+				found = 1;
+				break;
+			}
+		}
+		if(!found)
+		printf("%s: not found\n", type_command);
+		continue;
+	}
+
+	printf("%s: not found\n", input);
 }
 
   return 0;
