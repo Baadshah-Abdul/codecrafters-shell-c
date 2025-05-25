@@ -6,7 +6,8 @@
 int main(int argc, char *argv[]) {
   // Flush after every printf
   setbuf(stdout, NULL);
-   
+   char check[100];
+   char out[100];
 while(1)
 {
   // Uncomment this block to pass the first stage
@@ -24,7 +25,15 @@ while(1)
   if(strcmp(input,"exit 0") == 0)
   return 0;
 
-  printf("%s: command not found\n", input);
+//check for echo
+	strncpy(check, input, 4);
+	int echo_start = 5;
+	if (strcmp(check,"echo") == 0)
+		{
+			printf("%s\n", input + echo_start);
+		}
+	else
+	printf("%s: command not found\n", input);
 }
 
   return 0;
