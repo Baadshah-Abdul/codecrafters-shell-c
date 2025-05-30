@@ -3,13 +3,15 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#define SIZE 1028
 
 int main(int argc, char *argv[]) {
   // Flush after every printf
 	setbuf(stdout, NULL);
 	char command[100];
-	char shell_cmd[][100] = {"echo", "exit", "type"};
-	int n = 3;
+	char shell_cmd[][100] = {"echo", "exit", "type","history","pwd"};
+	int n = 5;//number of commands
+	char curr_wrk_dir[SIZE];
 
 while(1)
 {
@@ -35,6 +37,13 @@ while(1)
 			printf("%s\n", input + 5);
 			continue;
 		}
+	//check for pwd
+	if(strcmp(command, "pwd") == 0)
+	{
+		getcwd(curr_wrk_dir, SIZE);
+		printf("%s\n", curr_wrk_dir);
+		continue;
+	}
 
 	//check for type commands
 	if(strcmp(command,"type") == 0)
