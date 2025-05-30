@@ -67,6 +67,11 @@ while(1)
 	{
 		char *cd_p = input + 3;
 		int ret = chdir(cd_p);
+		if(strcmp(cd_p, "~") == 0)
+		{
+			chdir(getenv("HOME"));
+			ret = 0;
+		}
 		if(ret == -1)
 			printf("cd: %s: No such file or directory\n", cd_p);
 		found_command = 1;
