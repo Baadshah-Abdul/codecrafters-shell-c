@@ -3,15 +3,29 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+
 #define SIZE 1028
+
+int exec_echo(char *in)
+{
+	//check for echp
+		printf("%s\n", in + 5);
+}
+
+int exec_pwd(char *cwd)
+{
+	getcwd(cwd, SIZE);
+	printf("%s\n", cwd);
+
+}
+
 
 int main(int argc, char *argv[]) {
   // Flush after every printf
 	setbuf(stdout, NULL);
 	char command[100];
-	char shell_cmd[][100] = {"echo", "exit", "type","history","pwd"};
-	int n = 5;//number of commands
-	char curr_wrk_dir[SIZE];
+	char shell_cmd[][100] = {"echo", "exit", "type","history","pwd","cd"};
+	int n = 6;//number of commands
 
 while(1)
 {
@@ -19,6 +33,8 @@ while(1)
 	char input[100];
 	fgets(input, 100, stdin);
 	input[strcspn(input, "\n")] = '\0';
+	char curr_wrk_dir[SIZE];//current directory variable
+	int found_command = 0;
 
 	//continue even if empty
 	if(strlen(input) == 0)
@@ -30,19 +46,30 @@ while(1)
 	//exit 0
 	if(strcmp(command,"exit") == 0)
 	return 0;
-
+	
 	//check for echo
 	if(strcmp(command,"echo") == 0)
 		{
-			printf("%s\n", input + 5);
+			exec_echo(input);
 			continue;
 		}
+
+	
 	//check for pwd
 	if(strcmp(command, "pwd") == 0)
 	{
-		getcwd(curr_wrk_dir, SIZE);
-		printf("%s\n", curr_wrk_dir);
-		continue;
+			exec_pwd(curr_wrk_dir);	
+			continue;
+	}
+	
+	//check for cd
+	if(strcmp(command, "cd") == 0)
+	{
+		char *cd_p = input + 3;
+		int ret = chdir(cd_p);
+		if(ret == -1)
+			printf("cd: %s: No such file or directory\n", cd_p);
+		found_command = 1;
 	}
 
 	//check for type commands
@@ -103,11 +130,15 @@ while(1)
 		continue;
 	}
 
+
     //Handle external command
 	char *args[10];
 	int arg_count = 0;
 	char *token = strtok(input, " ");
 
+//in case command found then skip this part
+if(!found_command) 
+{
 	//extract arguments
 	while (token != NULL && arg_count < 10)
 		{
@@ -119,41 +150,47 @@ while(1)
 	//check for executable in PATH
 	char *exe_path = NULL;
         char *path = getenv("PATH");
-        if(path != NULL) {
+        if(path != NULL)
+		{
             char *path_copy = strdup(path);
             char *direc = strtok(path_copy, ":");
             
-            while(direc != NULL) {
+            while(direc != NULL) 
+			{
                 char full_path[512];
                 snprintf(full_path, sizeof(full_path), "%s/%s", direc, args[0]);
 				//check if executable
-                if(access(full_path, X_OK) == 0) {                      exe_path = strdup(full_path);   // Store found path
+                if(access(full_path, X_OK) == 0)
+				{
+					exe_path = strdup(full_path);// Store found path
                     break;
                 }
                 direc = strtok(NULL, ":");
             }
             free(path_copy);	
-			}
+		}
 
-			if(exe_path != NULL) 
+		if(exe_path != NULL) 
+		{
+			pid_t pid = fork();  // Create child process
+			if(pid == 0) 
 			{
-				pid_t pid = fork();  // Create child process
-				if(pid == 0) 
-				{
-                // Child process - execute program
-					execv(exe_path, args);
-					perror("execv");  					exit(1);
-				}
-				else if(pid > 0) {
-					// Parent process - wait for child
-					wait(NULL);
-				}
-				else
-					perror("fork");  
-                free(exe_path); 
+               // Child process - execute program
+				execv(exe_path, args);
+				perror("execv");  					exit(1);
+			}
+			else if(pid > 0)
+			{
+				// Parent process - wait for child
+				wait(NULL);
 			}
 			else
-				printf("%s: command not found \n", args[0]);
+				perror("fork");  
+            free(exe_path); 
+		}
+		else
+			printf("%s: command not found \n", args[0]);
+}
 }
 
 			return 0;
