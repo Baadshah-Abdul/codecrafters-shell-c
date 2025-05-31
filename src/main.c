@@ -17,39 +17,47 @@ void exec_echo(char *in)
     //skip 5 index
 	char *text = in + 5;
     
-    bool in_quotes = false;
+    bool inside_quotes = false;
     char quote_char = 0;
     bool space_needed = false;
-
+	bool backslash = false;
     while (*text != '\0')
 	{
-        if (!in_quotes && (*text == '\'' || *text == '\"'))
+        if (!backslash && !inside_quotes && (*text == '\'' || *text == '\"'))
 		{
-            // Start of quoted section
-            in_quotes = true;
+            //start of quote
+            inside_quotes = true;
             quote_char = *text;
             text++;
             continue;
         }
 
-        if (in_quotes && *text == quote_char)
+        if (!backslash && inside_quotes && *text == quote_char)
 		{
-            // End of quoted section
-            in_quotes = false;
+            //end of quote
+            inside_quotes = false;
             text++;
             space_needed = true;
             continue;
         }
 
-        if (!in_quotes && *text == ' ')
+		if (*text == '\\' && !escape)
 		{
-            // Handle spaces between arguments
+			// \ to next \ baclslash
+			backslash = true;
+			text++;
+			continue;
+		}
+
+        if (!inside_quotes && *text == ' ' && !backslash)
+		{
+            //spaces between arguments
             if (space_needed)
 			{
                 printf(" ");
                 space_needed = false;
             }
-            // Skip extra spaces
+            //skip extra spaces
             while (*text == ' ') text++;
             continue;
         }
@@ -58,6 +66,7 @@ void exec_echo(char *in)
         printf("%c", *text);
         text++;
         space_needed = true;
+		backskash = false;
     }
     printf("\n");
 }
