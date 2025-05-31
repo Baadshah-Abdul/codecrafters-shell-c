@@ -8,14 +8,56 @@
 #include <fcntl.h>//file flag
 #include <sys/stat.h>//file permissions
 #include <sys/types.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 
-#define SIZE 1028
+#define SIZE 512
 
+//builtin commands for autocompletion
+const char *builtin[] = {"echo", "exit", "type","history","pwd","cd", NULL};
+
+char *builtin_generator(const char *text, int state);
+char **builtin_completion(const char *text, int start, int end);
 bool exec_redirect(const char *in);
 void exec_echo(char *in);
 void parse_args(char *input, char *args[], int *arg_count);
 void exec_pwd(char *cwd);
+
+//generate matching builtin command suggestion
+char *builtin_generator(const char *text, int state)
+{
+	static int index, len;
+	const char *name;
+
+	if (!state)
+	{
+		index = 0;
+		len = strlen(text);
+	}
+
+	//search for match
+	while ((name = builtin[index++]))
+	{
+		//match little command
+		if (strncmp(name, text, len) == 0)
+		{
+			char *match = malloc(strlen(name) + 2);
+			sprintf(match, "%s", name);
+			return match;
+		}
+	}
+	return NULL;
+}
+
+char **builtin_completion(const char *text, int start, int end)
+{
+	//prevent filename completion
+	rl_attempted_completion_over = 1;
+	//return completed name to builtin_generator
+	return rl_completion_matches(text, builtin_generator);
+}
+
 
 bool exec_redirect(const char *in)
 {
@@ -195,20 +237,38 @@ int main(int argc, char *argv[])
     char command[100];
     char shell_cmd[][100] = {"echo", "exit", "type","history","pwd","cd"};
     int n = 6;//number of commands
-
-    while(1)
+	char input[SIZE];
+    
+	while(1)
 	{
-        printf("$ ");
-        char input[SIZE];
-        fgets(input, SIZE, stdin);
+		//register autocompletion function
+		rl_attempted_completion_function = builtin_completion;
+
+		//replace fget
+		char *line = readline("$ ");
+		
+		//even if empty prompt again
+		if (!line || strlen(line) == 0)
+		{
+			free(line);
+			continue;
+		}
+
+		//for UP arrow 
+		add_history(line);
+
+		//copy to input buffer and free readline buffer
+		strncpy(input, line, SIZE - 1);
+		free(line);
+
         input[strcspn(input, "\n")] = '\0';
         char curr_wrk_dir[SIZE];//current directory variable
         int found_command = 0;
-
+#if 0
         //continue even if empty
         if(strlen(input) == 0)
             continue;
-
+#endif
         //extract command from input
         sscanf(input, "%s", command);
 
