@@ -41,7 +41,7 @@ void exec_echo(char *in)
             continue;
         }
 
-		if (*text == '\\' && !escape)
+		if (*text == '\\' && !blackslash)
 		{
 			// \ to next \ baclslash
 			backslash = true;
