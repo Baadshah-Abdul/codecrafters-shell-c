@@ -19,26 +19,33 @@ void exec_pwd(char *cwd);
 
 bool exec_redirect(const char *in)
 {
-	char *redirect = strstr(in, "2>");
-	int redirect_fd = STDERR_FILENO;
+	const char *ops[] = {"1>>","2>>",">>","2>","1>",">"};
+	const int fds[] = {STDOUT_FILENO, STDERR_FILENO, STDOUT_FILENO, STDERR_FILENO, STDOUT_FILENO, STDOUT_FILENO};
+	const bool appends[] = {true, true, true, false, false, false};
 	
-	//find redirection operator
-	if(!redirect)
-	{
-		redirect = strstr(in, "1>");
-		redirect_fd = STDOUT_FILENO;
-	}
-	if(!redirect)
-	{
-		redirect = strstr(in, ">");
-		redirect_fd = STDOUT_FILENO;
-	}
+	char *redirect = NULL;
+	int redirect_fd = STDOUT_FILENO;
+	bool append_mode = false;
+	int op_index = -1;
 
+	//check redirection operator
+    for (int i = 0; i < 6; i++)
+	{
+		redirect = strstr(in, ops[i]);
+		if (redirect)
+		{
+			redirect_fd = fds[i];
+			append_mode = appends[i];
+			op_index = i;
+			break;
+		}
+	}
 	if(!redirect)
 		return true;
 	
-	//get pointer to filename
-	char *filename = redirect + (*(redirect + 1) == '>' ? 2 : 1);
+	//get filename
+	char *filename = redirect + strlen(ops[op_index]);
+
 	while(*filename == ' ' )
 		filename++;
 	
@@ -54,7 +61,9 @@ bool exec_redirect(const char *in)
 			return false;
     }
 
-	int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+	int flags = O_WRONLY|O_CREAT;
+	flags |= append_mode ? O_APPEND : O_TRUNC;
+	int fd = open(filename, flags, 0644);
 	if (fd < 0)
 		return false;
 	
@@ -218,37 +227,33 @@ int main(int argc, char *argv[])
 			{
 				char *args[512];
 				int args_count = 0;
-			
-				//save full input 
-				char f_in[SIZE];
-				strcpy(f_in, input);
+				char cmd_copy[SIZE];
+				strcpy(cmd_copy, input);
 				
 				//(1) perform redirection with ful input
-				if (!exec_redirect(f_in))
+				if (!exec_redirect(cmd_copy))
 					_exit(1);
-				
-				//extract the command
-				char cmd_in[SIZE];
-				strcpy(cmd_in, input);
-
-				
+								
 				//find redirection operator in input
-				char *redirect = strstr(input, "2>");
-				if (!redirect)
-					redirect = strstr(input, "1>");
-				if(!redirect)
-					redirect = strstr(input, ">");
-				//remove redirect part from modified input
-				if (redirect)
-					*redirect = '\0';
-
+				char *redirect;
+				const char *ops[] = {"1>>","2>>",">>","2>","1>",">"};
+				for (int i = 0; i < 6; i++)
+				{
+					redirect = strstr(input, ops[i]);
+					if(redirect)
+					{
+						*redirect = '\0';
+						break;
+					}
+				}
+		
 				parse_args(input, args, &args_count);
 				
 				//run input command
 				execvp(args[0], args);
 
-				//if exec fails
 				perror(args[0]);
+				//if exec fails
 				_exit(1);
 			}
 			//wiat for child
