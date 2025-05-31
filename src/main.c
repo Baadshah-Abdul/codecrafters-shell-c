@@ -12,22 +12,32 @@
 
 #define SIZE 1028
 
-bool exec_redirect(char *in, char *args[]);
+bool exec_redirect(const char *in);
 void exec_echo(char *in);
 void parse_args(char *input, char *args[], int *arg_count);
 void exec_pwd(char *cwd);
 
-bool exec_redirect(char *in, char *args[])
+bool exec_redirect(const char *in)
 {
+	char *redirect = strstr(in, "2>");
+	int redirect_fd = STDERR_FILENO;
+	
 	//find redirection operator
-	char *redirect = strstr(in, "1>");
 	if(!redirect)
+	{
+		redirect = strstr(in, "1>");
+		redirect_fd = STDOUT_FILENO;
+	}
+	if(!redirect)
+	{
 		redirect = strstr(in, ">");
+		redirect_fd = STDOUT_FILENO;
+	}
+
 	if(!redirect)
 		return true;
 	
-	//separate command and file
-	*redirect = '\0';
+	//get pointer to filename
 	char *filename = redirect + (*(redirect + 1) == '>' ? 2 : 1);
 	while(*filename == ' ' )
 		filename++;
@@ -39,10 +49,8 @@ bool exec_redirect(char *in, char *args[])
         char dir_path[SIZE];
         strncpy(dir_path, filename, last_slash - filename);
         dir_path[last_slash - filename] = '\0';
-        
-       // struct stat st;
-       // if (stat(dir_path, &st) == -1 || !S_ISDIR(st.st_mode))
-		if (access(dir_path, F_OK) != 0)
+
+       	if (access(dir_path, F_OK) != 0)
 			return false;
     }
 
@@ -50,8 +58,10 @@ bool exec_redirect(char *in, char *args[])
 	if (fd < 0)
 		return false;
 	
-	dup2(fd, STDOUT_FILENO);
+	//redirect the appropiate stream
+	dup2(fd, redirect_fd);
 	close(fd);
+
 	return true;
 }
 
@@ -199,8 +209,8 @@ int main(int argc, char *argv[])
         	
 		//check for redirection (> & 1>)
 		
-		// Check for output redirection (> or 1>)
-		if (strstr(input, ">") != NULL)
+		// Check for output redirection (> or 1> or 2>)
+		if (strstr(input, ">") != NULL)	
 		{
 			// Fork a child process to handle redirection
 			pid_t pid = fork();
@@ -209,28 +219,37 @@ int main(int argc, char *argv[])
 				char *args[512];
 				int args_count = 0;
 			
-				//save full input
+				//save full input 
 				char f_in[SIZE];
 				strcpy(f_in, input);
+				
+				//(1) perform redirection with ful input
+				if (!exec_redirect(f_in))
+					_exit(1);
+				
+				//extract the command
+				char cmd_in[SIZE];
+				strcpy(cmd_in, input);
 
-				//find redirection operator 
-				char *redirect = strstr(input, "1>");
+				
+				//find redirection operator in input
+				char *redirect = strstr(input, "2>");
 				if (!redirect)
+					redirect = strstr(input, "1>");
+				if(!redirect)
 					redirect = strstr(input, ">");
-
-				//cut input at redirectional symbol
+				//remove redirect part from modified input
 				if (redirect)
 					*redirect = '\0';
 
 				parse_args(input, args, &args_count);
-
-				//use full input for redirection
-				if (!exec_redirect(f_in, args))
-					return 0;
-
+				
+				//run input command
 				execvp(args[0], args);
+
+				//if exec fails
 				perror(args[0]);
-				exit(1);
+				_exit(1);
 			}
 			//wiat for child
 			waitpid(pid, NULL, 0);
