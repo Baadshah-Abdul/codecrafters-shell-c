@@ -3,200 +3,293 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <stdbool.h>
+#include <dirent.h>
 
 #define SIZE 1028
 
-int exec_echo(char *in)
+void exec_echo(char *in);
+void parse_args(char *input, char *args[], int *arg_count);
+int exec_pwd(char *cwd);
+
+void exec_echo(char *in)
 {
-	//check for echp
-		printf("%s\n", in + 5);
+    //skip 5 index
+	char *text = in + 5;
+    
+    bool in_quotes = false;
+    char quote_char = 0;
+    bool space_needed = false;
+
+    while (*text != '\0')
+	{
+        if (!in_quotes && (*text == '\'' || *text == '\"'))
+		{
+            // Start of quoted section
+            in_quotes = true;
+            quote_char = *text;
+            text++;
+            continue;
+        }
+
+        if (in_quotes && *text == quote_char)
+		{
+            // End of quoted section
+            in_quotes = false;
+            text++;
+            space_needed = true;
+            continue;
+        }
+
+        if (!in_quotes && *text == ' ')
+		{
+            // Handle spaces between arguments
+            if (space_needed)
+			{
+                printf(" ");
+                space_needed = false;
+            }
+            // Skip extra spaces
+            while (*text == ' ') text++;
+            continue;
+        }
+
+        // Print the character
+        printf("%c", *text);
+        text++;
+        space_needed = true;
+    }
+    printf("\n");
+}
+
+
+void parse_args(char *input, char *args[], int *arg_count)
+{
+    *arg_count = 0;
+    bool inside_quotes = false;
+    char quote_char = 0;//for '/"
+    char *start = input;
+    
+    while (*input)
+	{
+        if (!inside_quotes && (*input == '\'' || *input == '\"')) 
+		{
+            //start of quote
+            inside_quotes = true;
+            quote_char = *input;
+            start = input + 1;  
+		} 
+        else if (inside_quotes && *input == quote_char) 
+		{
+            //end of quote
+            inside_quotes = false;
+            args[(*arg_count)++] = start;
+            *input = '\0';  
+			start = input + 1;//for next argument
+        }
+        else if (!inside_quotes && *input == ' ')
+		{
+            //argument separator for outside quote argument
+            if (start != input)
+			{
+                args[(*arg_count)++] = start;
+                *input = '\0';  
+            }
+            start = input + 1;//for next argument
+        }
+        input++;
+    }
+    
+    //if input didnot end with space
+    if (start != input)
+	{
+        args[(*arg_count)++] = start;
+    }
+    args[*arg_count] = NULL;//if not null it might crash
 }
 
 int exec_pwd(char *cwd)
 {
-	getcwd(cwd, SIZE);
-	printf("%s\n", cwd);
-
+    getcwd(cwd, SIZE);
+    printf("%s\n", cwd);
+	return 0;
 }
 
-
-int main(int argc, char *argv[]) {
-  // Flush after every printf
-	setbuf(stdout, NULL);
-	char command[100];
-	char shell_cmd[][100] = {"echo", "exit", "type","history","pwd","cd"};
-	int n = 6;//number of commands
-
-while(1)
+int main(int argc, char *argv[])
 {
-	printf("$ ");
-	char input[100];
-	fgets(input, 100, stdin);
-	input[strcspn(input, "\n")] = '\0';
-	char curr_wrk_dir[SIZE];//current directory variable
-	int found_command = 0;
+    // Flush after every printf
+    setbuf(stdout, NULL);
+    char command[100];
+    char shell_cmd[][100] = {"echo", "exit", "type","history","pwd","cd"};
+    int n = 6;//number of commands
 
-	//continue even if empty
-	if(strlen(input) == 0)
-		continue;
-
-	//extract command from input
-	sscanf(input, "%s", command);
-
-	//exit 0
-	if(strcmp(command,"exit") == 0)
-	return 0;
-	
-	//check for echo
-	if(strcmp(command,"echo") == 0)
-		{
-			exec_echo(input);
-			continue;
-		}
-
-	
-	//check for pwd
-	if(strcmp(command, "pwd") == 0)
+    while(1)
 	{
-			exec_pwd(curr_wrk_dir);	
-			continue;
-	}
-	
-	//check for cd
-	if(strcmp(command, "cd") == 0)
-	{
-		char *cd_p = input + 3;
-		int ret = chdir(cd_p);
-		if(strcmp(cd_p, "~") == 0)
+        printf("$ ");
+        char input[SIZE];
+        fgets(input, SIZE, stdin);
+        input[strcspn(input, "\n")] = '\0';
+        char curr_wrk_dir[SIZE];//current directory variable
+        int found_command = 0;
+
+        //continue even if empty
+        if(strlen(input) == 0)
+            continue;
+
+        //extract command from input
+        sscanf(input, "%s", command);
+
+        //exit 0
+        if(strcmp(command,"exit") == 0)
+            return 0;
+        
+        //check for echo
+        if(strcmp(command,"echo") == 0)
 		{
-			chdir(getenv("HOME"));
-			ret = 0;
-		}
-		if(ret == -1)
-			printf("cd: %s: No such file or directory\n", cd_p);
-		found_command = 1;
-	}
+            exec_echo(input);
+            continue;
+        }
 
-	//check for type commands
-	if(strcmp(command,"type") == 0)
-	{
-		//extract command for path
-		char type_command[100] = {};
-		char *command_ptr = input + 5;
-		while(*command_ptr == ' ')
-			command_ptr++;
-		sscanf(command_ptr, "%s", type_command);
-		
-		//check for builtin
-		int found_type = 0;
-		for(int i = 0; i < n; i++)
+        //check for pwd
+        if(strcmp(command, "pwd") == 0)
 		{
-			if(strcmp(type_command, shell_cmd[i]) == 0)
-			{
-				printf("%s is a shell builtin\n", type_command);
-				found_type = 1;
-				break;
-			}
-		}
- 
-	//check PATH if not builtin
-		if(!found_type)
+            exec_pwd(curr_wrk_dir);    
+            continue;
+        }
+        
+        //check for cd
+        if(strcmp(command, "cd") == 0)
 		{
-			char *path = getenv("PATH");
-			if(path != NULL)
-			{
-				char *path_copy = strdup(path);
-				char *direc = strtok(path_copy, ":");
-				int found_path = 0;
-
-				while(direc != NULL)
-				{
-					//construct proper path with separator
-					char full_path[512];
-					snprintf(full_path, sizeof(full_path), "%s/%s", direc, type_command);
-					//check if executable
-					if (access(full_path, X_OK) == 0)
-					{
-						printf("%s is %s\n", type_command, full_path);
-						found_path = 1;
-						break;
-					}
-					direc = strtok(NULL, ":");
-				}
-				//free space from strdup()
-				free(path_copy);
-
-				if(!found_path)
-					printf("%s: not found\n", type_command);
-			}
-			else
-				printf("%s: not found\n", type_command);
-		}
-		continue;
-	}
-
-
-    //Handle external command
-	char *args[10];
-	int arg_count = 0;
-	char *token = strtok(input, " ");
-
-//in case command found then skip this part
-if(!found_command) 
-{
-	//extract arguments
-	while (token != NULL && arg_count < 10)
-		{
-			args[arg_count++] = token;
-			token = strtok(NULL, " ");
-		}
-	args[arg_count] = NULL; //NULL terminate argument list
-		
-	//check for executable in PATH
-	char *exe_path = NULL;
-        char *path = getenv("PATH");
-        if(path != NULL)
-		{
-            char *path_copy = strdup(path);
-            char *direc = strtok(path_copy, ":");
+            char *cd_p = input + 3;
+            while (*cd_p == ' ') cd_p++;
             
-            while(direc != NULL) 
+			//~ for home directory
+            if(strcmp(cd_p, "~") == 0)
 			{
-                char full_path[512];
-                snprintf(full_path, sizeof(full_path), "%s/%s", direc, args[0]);
-				//check if executable
-                if(access(full_path, X_OK) == 0)
+                chdir(getenv("HOME"));
+            } 
+			else
+			{
+                if(chdir(cd_p) == -1)
+                    printf("cd: %s: No such file or directory\n", cd_p);
+            }
+            found_command = 1;
+            continue;
+        }
+
+        //check for type commands
+        if(strcmp(command,"type") == 0)
+		{
+            //extract command
+            char type_command[100] = {};
+            char *command_ptr = input + 5;
+            while(*command_ptr == ' ')
+                command_ptr++;
+            sscanf(command_ptr, "%s", type_command);
+            
+            //check for builtin
+            int found_type = 0;
+            for(int i = 0; i < n; i++) 
+			{
+                if(strcmp(type_command, shell_cmd[i]) == 0)
 				{
-					exe_path = strdup(full_path);// Store found path
+                    printf("%s is a shell builtin\n", type_command);
+                    found_type = 1;
                     break;
                 }
-                direc = strtok(NULL, ":");
             }
-            free(path_copy);	
-		}
+     
+            //check PATH if not builtin
+            if(!found_type)
+			{
+                char *path = getenv("PATH");
+                if(path != NULL)
+				{
+                    char *path_copy = strdup(path);
+                    char *dir = strtok(path_copy, ":");
+                    int found_path = 0;
 
-		if(exe_path != NULL) 
+                    while(dir != NULL)
+					{
+                        //construct proper path with separator
+                        char full_path[512];
+                        snprintf(full_path, sizeof(full_path), "%s/%s", dir, type_command);
+                        //check if executable
+                        if(access(full_path, X_OK) == 0)
+						{
+                            printf("%s is %s\n", type_command, full_path);
+                            found_path = 1;
+                            break;
+                        }
+                        dir = strtok(NULL, ":");
+                    }
+                    //free strdup()
+                    free(path_copy);
+
+                    if(!found_path)
+                        printf("%s: not found\n", type_command);
+                }
+                else
+                    printf("%s: not found\n", type_command);
+            }
+            continue;
+        }
+
+        //external commands
+		char *args[10];
+        int arg_count = 0;
+        
+        if(!found_command)
 		{
-			pid_t pid = fork();  // Create child process
-			if(pid == 0) 
+            parse_args(input, args, &arg_count);
+            
+            //check for executable in PATH
+            char *exe_path = NULL;
+            char *path = getenv("PATH");
+            if(path != NULL)
 			{
-               // Child process - execute program
-				execv(exe_path, args);
-				perror("execv");  					exit(1);
-			}
-			else if(pid > 0)
-			{
-				// Parent process - wait for child
-				wait(NULL);
-			}
-			else
-				perror("fork");  
-            free(exe_path); 
-		}
-		else
-			printf("%s: command not found \n", args[0]);
-}
-}
+                char *path_copy = strdup(path);
+                char *direc = strtok(path_copy, ":");
+                
+                while(direc != NULL)
+				{
+                    char full_path[512];
+                    snprintf(full_path, sizeof(full_path), "%s/%s", direc, args[0]);
+                    //check if executable
+                    if(access(full_path, X_OK) == 0)
+					{
+						//store path
+                        exe_path = strdup(full_path);
+                        break;
+                    }
+                    direc = strtok(NULL, ":");
+                }
+                free(path_copy);    
+            }
 
-			return 0;
+            if(exe_path != NULL)
+			{
+				//create child
+                pid_t pid = fork();  
+				if(pid == 0)
+				{
+                    //child process executes program
+                    execv(exe_path, args);
+                    perror("execv");                      
+                    exit(1);
+                }
+                else if(pid > 0)
+				{
+                    //parent process wait for child
+                    wait(NULL);
+                }
+                else
+                    perror("fork()");  
+                free(exe_path); 
+            }
+            else
+                printf("%s: command not found\n", args[0]);
+        }
+    }
+    return 0;
 }
