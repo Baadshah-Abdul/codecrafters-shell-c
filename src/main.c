@@ -66,7 +66,7 @@ void exec_echo(char *in)
         printf("%c", *text);
         text++;
         space_needed = true;
-		backskash = false;
+		backslash = false;
     }
     printf("\n");
 }
