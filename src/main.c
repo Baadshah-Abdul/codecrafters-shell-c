@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <limits.h>
 
 
 #define SIZE 512
@@ -32,13 +33,14 @@ char *command_generator(const char *text, int state)
 	static struct dirent *entry;
 	static char *path_copy = NULL;
 	static char *path_token;
+	static char dir_path[SIZE];
 
 	if (!state)
 	{
 		index = 0;
 		len = strlen(text);
 
-		path_tokens = NULL;
+		path_token = NULL;
 		
 		//prepare PATH directory
 		if (path_copy) 
@@ -48,8 +50,9 @@ char *command_generator(const char *text, int state)
 	}
 
 	//search for builtin match
-	while ((name = builtin[index++]))
+	while (builtin[index])
 	{
+		const char *name = builtin[index++];
 		//match little command
 		if (strncmp(name, text, len) == 0)
 		{
@@ -64,8 +67,9 @@ char *command_generator(const char *text, int state)
         if (!dir)
         {
             if (!path_token) break; // no more directories
-            dir = opendir(path_token);
-            path_token = strtok(NULL, ":");
+            strncpy(dir_path, path_token, sizeof(dir_path) - 1);
+			dir = opendir(dir_path);
+			path_token = strtok(NULL, ":");
         }
 
         if (!dir) continue;
@@ -75,12 +79,12 @@ char *command_generator(const char *text, int state)
             if (strncmp(entry->d_name, text, len) == 0)
             {
                 // Construct full path
-                char full_path[SIZE];
-                snprintf(full_path, sizeof(full_path), "%s/%s", path_token, entry->d_name);
+                char full_path[PATH_MAX];
+                snprintf(full_path, PATH_MAX, "%s/%s", dir_path, entry->d_name);
                 if (access(full_path, X_OK) == 0)
                 {
                     char *match = malloc(strlen(entry->d_name) + 2);
-                    sprintf(match, "%s ", entry->d_name);
+                    sprintf(match, "%s", entry->d_name);
                     closedir(dir);
                     dir = NULL;
                     return match;
