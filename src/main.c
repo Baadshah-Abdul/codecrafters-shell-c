@@ -374,6 +374,19 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
+		// check for history
+		if (strcmp(command, "history") == 0)
+		{
+			HIST_ENTRY **the_list = history_list();
+			if (the_list)
+			{
+				for (int i = 0; the_list[i]; i++)
+				{
+					printf("%d  %s\n", i + 1, the_list[i]->line);
+				}
+			}
+			continue;
+		}
 
         //check for echo
         if(strcmp(command,"echo") == 0)
