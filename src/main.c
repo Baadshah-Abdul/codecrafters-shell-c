@@ -16,40 +16,41 @@ void exec_echo(char *in)
 {
     //skip 5 index
 	char *text = in + 5;
-    
-    bool inside_quotes = false;
-    char quote_char = 0;
     bool space_needed = false;
 	bool backslash = false;
+	bool in_sq = false;
+	bool in_dq = false;
+
     while (*text != '\0')
 	{
-        if (!backslash && !inside_quotes && (*text == '\'' || *text == '\"'))
+		if (!backslash)
 		{
-            //start of quote
-            inside_quotes = true;
-            quote_char = *text;
-            text++;
-            continue;
-        }
+			//for double quote
+            if (*text == '\"' && !in_sq)
+			{  
+                in_dq = !in_dq;
+                text++;
+                continue;
+            }
 
-        if (!backslash && inside_quotes && *text == quote_char)
+			//for single quote
+            if (*text == '\'' && !in_dq) 
+			{
+				in_sq = !in_sq;
+                text++;
+                continue;
+            }
+		}
+        
+		//for \ inside ' '
+		if (*text == '\\' && !in_sq && !backslash)
 		{
-            //end of quote
-            inside_quotes = false;
-            text++;
-            space_needed = true;
-            continue;
-        }
-
-		if (*text == '\\' && !backslash)
-		{
-			// \ to next \ baclslash
 			backslash = true;
 			text++;
 			continue;
 		}
-
-        if (!inside_quotes && *text == ' ' && !backslash)
+        
+        if (!in_sq && !in_dq && *text == ' ' && !backslash)
 		{
             //spaces between arguments
             if (space_needed)
@@ -62,7 +63,6 @@ void exec_echo(char *in)
             continue;
         }
 
-        // Print the character
         printf("%c", *text);
         text++;
         space_needed = true;
