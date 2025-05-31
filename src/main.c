@@ -17,26 +17,37 @@
 //builtin commands for autocompletion
 const char *builtin[] = {"echo", "exit", "type","history","pwd","cd", NULL};
 
-char *builtin_generator(const char *text, int state);
-char **builtin_completion(const char *text, int start, int end);
+char *command_generator(const char *text, int state);
+char **command_completion(const char *text, int start, int end);
 bool exec_redirect(const char *in);
 void exec_echo(char *in);
 void parse_args(char *input, char *args[], int *arg_count);
 void exec_pwd(char *cwd);
 
 //generate matching builtin command suggestion
-char *builtin_generator(const char *text, int state)
+char *command_generator(const char *text, int state)
 {
-	static int index, len;
-	const char *name;
+	static int index = 0, len;
+	static DIR *dir = NULL;
+	static struct dirent *entry;
+	static char *path_copy = NULL;
+	static char *path_token;
 
 	if (!state)
 	{
 		index = 0;
 		len = strlen(text);
+
+		path_tokens = NULL;
+		
+		//prepare PATH directory
+		if (path_copy) 
+			free(path_copy);
+		path_copy = strdup(getenv("PATH"));
+		path_token = strtok(path_copy, ":");
 	}
 
-	//search for match
+	//search for builtin match
 	while ((name = builtin[index++]))
 	{
 		//match little command
@@ -47,15 +58,53 @@ char *builtin_generator(const char *text, int state)
 			return match;
 		}
 	}
+	 // Search through PATH directories
+    while (1)
+    {
+        if (!dir)
+        {
+            if (!path_token) break; // no more directories
+            dir = opendir(path_token);
+            path_token = strtok(NULL, ":");
+        }
+
+        if (!dir) continue;
+
+        while ((entry = readdir(dir)) != NULL)
+        {
+            if (strncmp(entry->d_name, text, len) == 0)
+            {
+                // Construct full path
+                char full_path[SIZE];
+                snprintf(full_path, sizeof(full_path), "%s/%s", path_token, entry->d_name);
+                if (access(full_path, X_OK) == 0)
+                {
+                    char *match = malloc(strlen(entry->d_name) + 2);
+                    sprintf(match, "%s ", entry->d_name);
+                    closedir(dir);
+                    dir = NULL;
+                    return match;
+                }
+            }
+        }
+        closedir(dir);
+		dir = NULL;
+    }
+
+    if (path_copy) 
+	{
+        free(path_copy);
+        path_copy = NULL;
+    }
 	return NULL;
 }
 
-char **builtin_completion(const char *text, int start, int end)
+char **command_completion(const char *text, int start, int end)
 {
 	//prevent filename completion
 	rl_attempted_completion_over = 1;
 	//return completed name to builtin_generator
-	return rl_completion_matches(text, builtin_generator);
+	return rl_completion_matches(text, command_generator);
 }
 
 
@@ -242,7 +291,7 @@ int main(int argc, char *argv[])
 	while(1)
 	{
 		//register autocompletion function
-		rl_attempted_completion_function = builtin_completion;
+		rl_attempted_completion_function = command_completion;
 
 		//replace fget
 		char *line = readline("$ ");
