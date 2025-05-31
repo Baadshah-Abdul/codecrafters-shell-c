@@ -377,6 +377,7 @@ int main(int argc, char *argv[])
 		// check for history
 		if (strcmp(command, "history") == 0)
 		{
+			//from readline/history.h
 			HIST_ENTRY **the_list = history_list();
 			if (the_list)
 			{
