@@ -5,12 +5,56 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <dirent.h>
+#include <fcntl.h>//file flag
+#include <sys/stat.h>//file permissions
+#include <sys/types.h>
+
 
 #define SIZE 1028
 
+bool exec_redirect(char *in, char *args[]);
 void exec_echo(char *in);
 void parse_args(char *input, char *args[], int *arg_count);
-int exec_pwd(char *cwd);
+void exec_pwd(char *cwd);
+
+bool exec_redirect(char *in, char *args[])
+{
+	//find redirection operator
+	char *redirect = strstr(in, "1>");
+	if(!redirect)
+		redirect = strstr(in, ">");
+	if(!redirect)
+		return true;
+	
+	//separate command and file
+	*redirect = '\0';
+	char *filename = redirect + (*(redirect + 1) == '>' ? 2 : 1);
+	while(*filename == ' ' )
+		filename++;
+	
+	//check if directory exist
+	char *last_slash = strrchr(filename, '/');
+    if (last_slash != NULL)
+	{
+        char dir_path[SIZE];
+        strncpy(dir_path, filename, last_slash - filename);
+        dir_path[last_slash - filename] = '\0';
+        
+       // struct stat st;
+       // if (stat(dir_path, &st) == -1 || !S_ISDIR(st.st_mode))
+		if (access(dir_path, F_OK) != 0)
+			return false;
+    }
+
+	int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+	if (fd < 0)
+		return false;
+	
+	dup2(fd, STDOUT_FILENO);
+	close(fd);
+	return true;
+}
+
 
 void exec_echo(char *in)
 {
@@ -117,12 +161,13 @@ void parse_args(char *input, char *args[], int *arg_count)
     args[*arg_count] = NULL;//if not null it might crash
 }
 
-int exec_pwd(char *cwd)
+void exec_pwd(char *cwd)
 {
     getcwd(cwd, SIZE);
     printf("%s\n", cwd);
-	return 0;
 }
+
+
 
 int main(int argc, char *argv[])
 {
@@ -151,7 +196,48 @@ int main(int argc, char *argv[])
         //exit 0
         if(strcmp(command,"exit") == 0)
             return 0;
-        
+        	
+		//check for redirection (> & 1>)
+		
+		// Check for output redirection (> or 1>)
+		if (strstr(input, ">") != NULL)
+		{
+			// Fork a child process to handle redirection
+			pid_t pid = fork();
+			if (pid == 0)
+			{
+				char *args[512];
+				int args_count = 0;
+			
+				//save full input
+				char f_in[SIZE];
+				strcpy(f_in, input);
+
+				//find redirection operator 
+				char *redirect = strstr(input, "1>");
+				if (!redirect)
+					redirect = strstr(input, ">");
+
+				//cut input at redirectional symbol
+				if (redirect)
+					*redirect = '\0';
+
+				parse_args(input, args, &args_count);
+
+				//use full input for redirection
+				if (!exec_redirect(f_in, args))
+					return 0;
+
+				execvp(args[0], args);
+				perror(args[0]);
+				exit(1);
+			}
+			//wiat for child
+			waitpid(pid, NULL, 0);
+			continue;
+		}
+
+
         //check for echo
         if(strcmp(command,"echo") == 0)
 		{
@@ -185,8 +271,8 @@ int main(int argc, char *argv[])
             found_command = 1;
             continue;
         }
-
-        //check for type commands
+	        
+		//check for type commands
         if(strcmp(command,"type") == 0)
 		{
             //extract command
@@ -298,7 +384,8 @@ int main(int argc, char *argv[])
             }
             else
                 printf("%s: command not found\n", args[0]);
-        }
+        }		
+
     }
     return 0;
 }
